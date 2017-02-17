@@ -62,6 +62,14 @@ AX_PROG_CXX_MPI(,,AC_MSG_FAILURE([ScaFaCoS requires an MPI C++ compiler.]))
 # Get the Fortran MPI compiler.
 AX_PROG_FC_MPI(,,AC_MSG_FAILURE([ScaFaCoS requires an MPI Fortran compiler.]))
 
+# Enable OpenMP usage
+AC_OPENMP
+if test "x$ac_cv_prog_c_openmp" != "xunsupported" && test "x$ac_cv_prog_c_openmp" != "x"; then
+	enable_openmp=yes
+else
+    enable_openmp=no
+fi
+
 # Accept preprocessed source files names ending in ".f90".
 AC_FC_PP_SRCEXT([f90])
 
@@ -164,6 +172,21 @@ if test "x$enable_single_lib" = xyes ; then
     *--disable-library-install*) ;;
     *) ac_configure_args="$ac_configure_args --disable-library-install" ;;
   esac
+fi
+
+# Decide if we want Xeon Phi offloading.
+AC_ARG_ENABLE([xeonphi-offloading],
+ [AS_HELP_STRING([--enable-xeonphi-offloading],[enable Intel Xeon Phi offloading])],,
+ [enable_xeonphi_offloading=no])
+if test "x$enable_xeonphi_offloading" = xyes ; then
+  AC_MSG_CHECKING([for openmp])
+  AC_MSG_RESULT($enable_openmp)
+  if test "x$enable_openmp" = xyes ; then
+    AC_MSG_NOTICE([enabled Intel Xeon Phi offloading])
+    AC_MSG_WARN([support not finished])
+  else
+    AC_MSG_ERROR([cannot enabled Intel Xeon Phi offloading without openmp])
+  fi
 fi
 
 # Decide which solvers we want to build.
@@ -931,6 +954,8 @@ AC_MSG_NOTICE([-----------------])
 AC_MSG_NOTICE([ FCS C types                = $fcs_int / $fcs_float])
 AC_MSG_NOTICE([ FCS Fortan types           = $fcs_integer / $fcs_real])
 AC_MSG_NOTICE([ Fortan interface           = $use_fcs_fortran])
+AC_MSG_NOTICE([ OpenMP support             = $enable_openmp])
+AC_MSG_NOTICE([ Xeon Phi offloading        = $enable_xeonphi_offloading])
 AC_MSG_NOTICE([])
 AC_FOREACH([method], all_common_methods,
 [

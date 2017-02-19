@@ -343,24 +343,26 @@ static void directc_local_two(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_in
 
 static void directc_local_periodic(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, fcs_float *xyz1, fcs_float *q1, fcs_float *f, fcs_float *p, fcs_int *periodic, fcs_float *box_a, fcs_float *box_b, fcs_float *box_c, fcs_float cutoff)
 {
-  fcs_int i, j, pd[3];
+  fcs_int i, j, pd_x, pd_y, pd_z;
   fcs_float dx, dy, dz, ir;
 
 
   if (fcs_fabs(cutoff) > 0) cutoff = 1.0 / cutoff;
 
-  for (pd[0] = -periodic[0]; pd[0] <= periodic[0]; ++pd[0])
-  for (pd[1] = -periodic[1]; pd[1] <= periodic[1]; ++pd[1])
-  for (pd[2] = -periodic[2]; pd[2] <= periodic[2]; ++pd[2])
+#pragma omp parallel private(i, j, pd_x, pd_y, pd_z, dx, dy, dz, ir) shared(p, f, q1)
+#pragma omp for schedule(static) collapse(3)
+  for (pd_x = -periodic[0]; pd_x <= periodic[0]; ++pd_x)
+  for (pd_y = -periodic[1]; pd_y <= periodic[1]; ++pd_y)
+  for (pd_z = -periodic[2]; pd_z <= periodic[2]; ++pd_z)
   {
-    if (pd[0] == 0 && pd[1] == 0 && pd[2] == 0) continue;
+    if (pd_x == 0 && pd_y == 0 && pd_z == 0) continue;
 
     for (i = 0; i < n0; ++i)
     for (j = 0; j < n1; ++j)
     {
-      dx = xyz0[i*3+0] - (xyz1[j*3+0] + (pd[0] * box_a[0]) + (pd[1] * box_b[0]) + (pd[2] * box_c[0]));
-      dy = xyz0[i*3+1] - (xyz1[j*3+1] + (pd[0] * box_a[1]) + (pd[1] * box_b[1]) + (pd[2] * box_c[1]));
-      dz = xyz0[i*3+2] - (xyz1[j*3+2] + (pd[0] * box_a[2]) + (pd[1] * box_b[2]) + (pd[2] * box_c[2]));
+      dx = xyz0[i*3+0] - (xyz1[j*3+0] + (pd_x * box_a[0]) + (pd_y * box_b[0]) + (pd_z * box_c[0]));
+      dy = xyz0[i*3+1] - (xyz1[j*3+1] + (pd_x * box_a[1]) + (pd_y * box_b[1]) + (pd_z * box_c[1]));
+      dz = xyz0[i*3+2] - (xyz1[j*3+2] + (pd_x * box_a[2]) + (pd_y * box_b[2]) + (pd_z * box_c[2]));
 
       ir = 1.0 / fcs_sqrt(z_sqr(dx) + z_sqr(dy) + z_sqr(dz));
 

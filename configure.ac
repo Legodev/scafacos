@@ -768,6 +768,7 @@ if test "x$use_fcs_direct" = xyes ; then
   AC_CONFIG_FILES([lib/direct/Makefile])
   AX_FCS_PACKAGE_ADD([direct_LIBS],[-lfcs_direct])
   AX_FCS_PACKAGE_ADD([direct_LIBS_A],[lib/direct/libfcs_direct.la])
+  AX_FCS_PACKAGE_ADD([direct_LDADD],[$OPENMP_CFLAGS])
 fi
 if test "x$use_fcs_memd" = xyes ; then
   AC_CONFIG_FILES([lib/memd/Makefile])
@@ -955,7 +956,10 @@ AC_MSG_NOTICE([ FCS C types                = $fcs_int / $fcs_float])
 AC_MSG_NOTICE([ FCS Fortan types           = $fcs_integer / $fcs_real])
 AC_MSG_NOTICE([ Fortan interface           = $use_fcs_fortran])
 AC_MSG_NOTICE([ OpenMP support             = $enable_openmp])
+if test "x$enable_openmp" = xyes ; then
+AC_MSG_NOTICE([ OpenMP CFLAGS              = $OPENMP_CFLAGS])
 AC_MSG_NOTICE([ Xeon Phi offloading        = $enable_xeonphi_offloading])
+fi
 AC_MSG_NOTICE([])
 AC_FOREACH([method], all_common_methods,
 [

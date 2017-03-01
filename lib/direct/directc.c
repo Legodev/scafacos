@@ -349,51 +349,46 @@ static void directc_local_periodic (fcs_int n0, fcs_float *xyz0, fcs_float *q0, 
   if (fcs_fabs(cutoff) > 0)
     cutoff = 1.0 / cutoff;
 
-#pragma omp parallel private(i, j, pd_x, pd_y, pd_z, dx, dy, dz, ir, p_sum, f_sum_zero, f_sum_one, f_sum_two) shared(p, f, q1, xyz0, xyz1, box_a, box_b, box_c, cutoff)
+#pragma omp parallel for schedule(static) private(i, j, pd_x, pd_y, pd_z, dx, dy, dz, ir, p_sum, f_sum_zero, f_sum_one, f_sum_two) shared(p, f, q1, xyz0, xyz1, box_a, box_b, box_c, cutoff)
+  for (i = 0; i < n0; ++i)
   {
-#pragma omp for schedule(static)
-    for (i = 0; i < n0; ++i)
+    p_sum = 0.0;
+    f_sum_zero = 0.0;
+    f_sum_one = 0.0;
+    f_sum_two = 0.0;
+
+#pragma omp parallel for schedule(static) collapse(4) private(j, pd_x, pd_y, pd_z, dx, dy, dz, ir) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two) shared(p, f, q1, xyz0, xyz1, box_a, box_b, box_c, cutoff)
+    for (j = 0; j < n1; ++j)
+    for (pd_x = -periodic[0]; pd_x <= periodic[0]; ++pd_x)
+    for (pd_y = -periodic[1]; pd_y <= periodic[1]; ++pd_y)
+    for (pd_z = -periodic[2]; pd_z <= periodic[2]; ++pd_z)
     {
-      p_sum = 0.0;
-      f_sum_zero = 0.0;
-      f_sum_one = 0.0;
-      f_sum_two = 0.0;
-//#pragma omp parallel for reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two)
-#pragma omp parallel for schedule(static) collapse(4) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two)
-      for (j = 0; j < n1; ++j)
-      {
-	for (pd_x = -periodic[0]; pd_x <= periodic[0]; ++pd_x)
-	for (pd_y = -periodic[1]; pd_y <= periodic[1]; ++pd_y)
-	for (pd_z = -periodic[2]; pd_z <= periodic[2]; ++pd_z)
-	{
-	  if (pd_x == 0 && pd_y == 0 && pd_z == 0)
-	    continue;
+      if (pd_x == 0 && pd_y == 0 && pd_z == 0)
+	continue;
 
-	  dx = xyz0[i * 3 + 0] - (xyz1[j * 3 + 0] + (pd_x * box_a[0]) + (pd_y * box_b[0]) + (pd_z * box_c[0]));
-	  dy = xyz0[i * 3 + 1] - (xyz1[j * 3 + 1] + (pd_x * box_a[1]) + (pd_y * box_b[1]) + (pd_z * box_c[1]));
-	  dz = xyz0[i * 3 + 2] - (xyz1[j * 3 + 2] + (pd_x * box_a[2]) + (pd_y * box_b[2]) + (pd_z * box_c[2]));
+      dx = xyz0[i * 3 + 0] - (xyz1[j * 3 + 0] + (pd_x * box_a[0]) + (pd_y * box_b[0]) + (pd_z * box_c[0]));
+      dy = xyz0[i * 3 + 1] - (xyz1[j * 3 + 1] + (pd_x * box_a[1]) + (pd_y * box_b[1]) + (pd_z * box_c[1]));
+      dz = xyz0[i * 3 + 2] - (xyz1[j * 3 + 2] + (pd_x * box_a[2]) + (pd_y * box_b[2]) + (pd_z * box_c[2]));
 
-	  ir = 1.0 / fcs_sqrt(z_sqr(dx) + z_sqr(dy) + z_sqr(dz));
+      ir = 1.0 / fcs_sqrt(z_sqr(dx) + z_sqr(dy) + z_sqr(dz));
 
-	  if ((cutoff > 0 && cutoff > ir) || (cutoff < 0 && -cutoff < ir))
-	    continue;
+      if ((cutoff > 0 && cutoff > ir) || (cutoff < 0 && -cutoff < ir))
+	continue;
 
-	  p_sum += q1[j] * ir;
+      p_sum += q1[j] * ir;
 
-	  f_sum_zero += q1[j] * dx * ir * ir * ir;
-	  f_sum_one += q1[j] * dy * ir * ir * ir;
-	  f_sum_two += q1[j] * dz * ir * ir * ir;
-	}
-      }
+      f_sum_zero += q1[j] * dx * ir * ir * ir;
+      f_sum_one += q1[j] * dy * ir * ir * ir;
+      f_sum_two += q1[j] * dz * ir * ir * ir;
+    }
 
 #pragma omp critical
-      {
-	p[i] += p_sum;
+    {
+      p[i] += p_sum;
 
-	f[i * 3 + 0] += f_sum_zero;
-	f[i * 3 + 1] += f_sum_one;
-	f[i * 3 + 2] += f_sum_two;
-      }
+      f[i * 3 + 0] += f_sum_zero;
+      f[i * 3 + 1] += f_sum_one;
+      f[i * 3 + 2] += f_sum_two;
     }
   }
 }

@@ -265,12 +265,21 @@ static void directc_local_one(fcs_int nout, fcs_int nin, fcs_float *xyz, fcs_flo
 {
   fcs_int i, j;
   fcs_float dx, dy, dz, ir;
+  fcs_float p_sum, f_sum_zero, f_sum_one, f_sum_two;
 
 
   if (fcs_fabs(cutoff) > 0) cutoff = 1.0 / cutoff;
 
+// not parallelizable because of access conflicts where inner loop accesses the field of the next outer loop
   for (i = 0; i < nout; ++i)
   {
+    p_sum = 0.0;
+    f_sum_zero = 0.0;
+    f_sum_one = 0.0;
+    f_sum_two = 0.0;
+
+// parallelizable
+#pragma omp parallel for schedule(static) private(j, dx, dy, dz, ir) shared(i, p, f, q, xyz, cutoff) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two)
     for (j = i + 1; j < nout; ++j)
     {
       dx = xyz[i*3+0] - xyz[j*3+0];
@@ -281,18 +290,19 @@ static void directc_local_one(fcs_int nout, fcs_int nin, fcs_float *xyz, fcs_flo
 
       if ((cutoff > 0 && cutoff > ir) || (cutoff < 0 && -cutoff < ir)) continue;
 
-      p[i] += q[j] * ir;
+      p_sum += q[j] * ir;
       p[j] += q[i] * ir;
 
-      f[i*3+0] += q[j] * dx * ir * ir * ir;
-      f[i*3+1] += q[j] * dy * ir * ir * ir;
-      f[i*3+2] += q[j] * dz * ir * ir * ir;
+      f_sum_zero += q[j] * dx * ir * ir * ir;
+      f_sum_one += q[j] * dy * ir * ir * ir;
+      f_sum_two += q[j] * dz * ir * ir * ir;
 
       f[j*3+0] -= q[i] * dx * ir * ir * ir;
       f[j*3+1] -= q[i] * dy * ir * ir * ir;
       f[j*3+2] -= q[i] * dz * ir * ir * ir;
     }
 
+#pragma omp parallel for schedule(static) private(j, dx, dy, dz, ir) shared(i, p, f, q, xyz, cutoff) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two)
     for (j = nout; j < nin; ++j)
     {
       dx = xyz[i*3+0] - xyz[j*3+0];
@@ -303,11 +313,19 @@ static void directc_local_one(fcs_int nout, fcs_int nin, fcs_float *xyz, fcs_flo
 
       if ((cutoff > 0 && cutoff > ir) || (cutoff < 0 && -cutoff < ir)) continue;
 
-      p[i] += q[j] * ir;
+      p_sum += q[j] * ir;
 
-      f[i*3+0] += q[j] * dx * ir * ir * ir;
-      f[i*3+1] += q[j] * dy * ir * ir * ir;
-      f[i*3+2] += q[j] * dz * ir * ir * ir;
+      f_sum_zero += q[j] * dx * ir * ir * ir;
+      f_sum_one += q[j] * dy * ir * ir * ir;
+      f_sum_two += q[j] * dz * ir * ir * ir;
+    }
+#pragma omp critical
+    {
+      p[i] += p_sum;
+
+      f[i*3+0] += f_sum_zero;
+      f[i*3+1] += f_sum_one;
+      f[i*3+2] += f_sum_two;
     }
   }
 }

@@ -84,6 +84,16 @@
 #define TIMING_STOP(_t_)           TIMING_CMD(((_t_) = MPI_Wtime() - (_t_));)
 #define TIMING_STOP_ADD(_t_, _r_)  TIMING_CMD(((_r_) += MPI_Wtime() - (_t_));)
 
+// defines for MIC Offloading
+#define ALLOC alloc_if(1) free_if(0)
+#define FREE alloc_if(0) free_if(1)
+#define REUSE alloc_if(0) free_if(0)
+/*
+#define ALLOC   alloc_if(1)
+#define FREE    free_if(1)
+#define RETAIN  free_if(0)
+#define REUSE   alloc_if(0)
+*/
 
 void fcs_directc_create(fcs_directc_t *directc)
 {
@@ -401,7 +411,7 @@ static void directc_local_periodic (fcs_int n0, fcs_float *xyz0, fcs_float *q0, 
     for (pd_z = -periodic[2]; pd_z <= periodic[2]; ++pd_z)
     {
       if (pd_x == 0 && pd_y == 0 && pd_z == 0)
-	continue;
+        continue;
 
       dx = xyz0[i * 3 + 0] - (xyz1[j * 3 + 0] + (pd_x * box_a[0]) + (pd_y * box_b[0]) + (pd_z * box_c[0]));
       dy = xyz0[i * 3 + 1] - (xyz1[j * 3 + 1] + (pd_x * box_a[1]) + (pd_y * box_b[1]) + (pd_z * box_c[1]));
@@ -410,7 +420,7 @@ static void directc_local_periodic (fcs_int n0, fcs_float *xyz0, fcs_float *q0, 
       ir = 1.0 / fcs_sqrt(z_sqr(dx) + z_sqr(dy) + z_sqr(dz));
 
       if ((cutoff > 0 && cutoff > ir) || (cutoff < 0 && -cutoff < ir))
-	continue;
+        continue;
 
       p_sum += q1[j] * ir;
 
@@ -464,8 +474,38 @@ static void directc_global(fcs_directc_t *directc, fcs_int *periodic, int size, 
     memcpy(other_q + directc->nparticles, directc->in_charges, directc->in_nparticles * sizeof(fcs_float));
   }
 
-  directc_local_one(directc->nparticles, other_n, other_xyz, other_q, directc->field, directc->potentials, directc->cutoff);
-  directc_local_periodic(directc->nparticles, directc->positions, directc->charges, other_n, other_xyz, other_q, directc->field, directc->potentials, periodic, directc->box_a, directc->box_b, directc->box_c, directc->cutoff);
+#pragma offload target(mic:0) in(directc->nparticles, directc->positions:length(directc->nparticles * 3), directc->charges:length(directc->nparticles), \
+                                 other_n, other_xyz:length(directc->nparticles * 3), other_q:length(directc->nparticles), periodic:length(3), \
+                                 directc->box_a:length(3), directc->box_b:length(3), directc->box_c:length(3) \
+                                 directc->field:length(directc->nparticles * 3), directc->potentials:length(directc->nparticles), directc->cutoff) \
+                                 ALLOC)
+  {
+  /* directc->nparticles        unmodified      value
+   * other_n                    unmodified      value
+   * other_xyz                  unmodified      array(directc->nparticles * 3)
+   * other_q                    unmodified      array(directc->nparticles)
+   * directc->field               modified      array(directc->nparticles * 3)
+   * directc->potentials          modified      array(directc->nparticles)
+   * directc->cutoff              modified      value
+   */
+    directc_local_one(directc->nparticles, other_n, other_xyz, other_q, directc->field, directc->potentials, directc->cutoff);
+
+  /* directc->nparticles        unmodified      value
+   * directc->positions         unmodified      array(directc->nparticles * 3)
+   * directc->charges               unused      array(directc->nparticles)
+   * other_n                    unmodified      value
+   * other_xyz                  unmodified      array(directc->nparticles * 3)
+   * other_q                    unmodified      array(directc->nparticles)
+   * directc->field               modified      array(directc->nparticles * 3)
+   * directc->potentials          modified      array(directc->nparticles * 3)
+   * periodic                   unmodified      array(3)
+   * directc->box_a             unmodified      array(3)
+   * directc->box_b             unmodified      array(3)
+   * directc->box_c             unmodified      array(3)
+   * directc->cutoff              modified      value
+   */
+    directc_local_periodic(directc->nparticles, directc->positions, directc->charges, other_n, other_xyz, other_q, directc->field, directc->potentials, periodic, directc->box_a, directc->box_b, directc->box_c, directc->cutoff);
+  }
 
   for (l = 1; l < size; ++l)
   {
@@ -477,9 +517,46 @@ static void directc_global(fcs_directc_t *directc, fcs_int *periodic, int size, 
     other_xyz = other_xyzq;
     other_q = other_xyzq + 3 * other_n;
 
-    directc_local_two(directc->nparticles, directc->positions, directc->charges, other_n, other_xyz, other_q, directc->field, directc->potentials, directc->cutoff);
-    directc_local_periodic(directc->nparticles, directc->positions, directc->charges, other_n, other_xyz, other_q, directc->field, directc->potentials, periodic, directc->box_a, directc->box_b, directc->box_c, directc->cutoff);
+#pragma offload target(mic:0) nocopy(directc->nparticles, directc->positions:length(directc->nparticles * 3), directc->charges:length(directc->nparticles), \
+                                 periodic:length(3), directc->box_a:length(3), directc->box_b:length(3), directc->box_c:length(3) \
+                                 directc->field:length(directc->nparticles * 3), directc->potentials:length(directc->nparticles), directc->cutoff) \
+                                 in(other_n, other_xyz:length(directc->nparticles * 3), other_q:length(directc->nparticles)) \
+                                 REUSE)
+     {
+      /* directc->nparticles            unmodified      value
+       * directc->positions             unmodified      array(directc->nparticles * 3)
+       * directc->charges                   unused      array(directc->nparticles)
+       * other_n                        unmodified      value
+       * other_xyz                      unmodified      array(directc->nparticles * 3)
+       * other_q                        unmodified      array(directc->nparticles)
+       * directc->field                 modified        array(directc->nparticles * 3)
+       * directc->potentials            modified        array(directc->nparticles * 3)
+       * directc->cutoff                  modified      value
+       */
+      directc_local_two(directc->nparticles, directc->positions, directc->charges, other_n, other_xyz, other_q, directc->field, directc->potentials, directc->cutoff);
+      /* directc->nparticles            unmodified      value
+       * directc->positions             unmodified      array(directc->nparticles * 3)
+       * directc->charges                   unused      array(directc->nparticles)
+       * other_n                        unmodified      value
+       * other_xyz                      unmodified      array(directc->nparticles * 3)
+       * other_q                        unmodified      array(directc->nparticles)
+       * directc->field                   modified      array(directc->nparticles * 3)
+       * directc->potentials              modified      array(directc->nparticles * 3)
+       * periodic                       unmodified      array(3)
+       * directc->box_a                 unmodified      array(3)
+       * directc->box_b                 unmodified      array(3)
+       * directc->box_c                 unmodified      array(3)
+       * directc->cutoff                  modified      value
+       */
+      directc_local_periodic(directc->nparticles, directc->positions, directc->charges, other_n, other_xyz, other_q, directc->field, directc->potentials, periodic, directc->box_a, directc->box_b, directc->box_c, directc->cutoff);
+    }
   }
+
+#pragma offload_transfer target(mic:0) nocopy(directc->nparticles, directc->positions:length(directc->nparticles * 3), directc->charges:length(directc->nparticles), \
+                                 periodic:length(3), directc->box_a:length(3), directc->box_b:length(3), directc->box_c:length(3) \
+                                 directc->cutoff, other_n, other_xyz:length(directc->nparticles * 3), other_q:length(directc->nparticles)) \
+                                 out(directc->field:length(directc->nparticles * 3), directc->potentials:length(directc->nparticles)) \
+                                 FREE)
 
   free(other_xyzq);
 }

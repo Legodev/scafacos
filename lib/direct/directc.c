@@ -335,26 +335,45 @@ static void directc_local_two(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_in
 {
   fcs_int i, j;
   fcs_float dx, dy, dz, ir;
+  fcs_float p_sum, f_sum_zero, f_sum_one, f_sum_two;
 
 
   if (fcs_fabs(cutoff) > 0) cutoff = 1.0 / cutoff;
 
+#pragma omp parallel for schedule(static) private(i, j, dx, dy, dz, ir, p_sum, f_sum_zero, f_sum_one, f_sum_two) shared(p, f, q1, xyz0, xyz1, cutoff)
   for (i = 0; i < n0; ++i)
-  for (j = 0; j < n1; ++j)
   {
-    dx = xyz0[i*3+0] - xyz1[j*3+0];
-    dy = xyz0[i*3+1] - xyz1[j*3+1];
-    dz = xyz0[i*3+2] - xyz1[j*3+2];
+    p_sum = 0.0;
+    f_sum_zero = 0.0;
+    f_sum_one = 0.0;
+    f_sum_two = 0.0;
 
-    ir = 1.0 / fcs_sqrt(z_sqr(dx) + z_sqr(dy) + z_sqr(dz));
+#pragma omp parallel for schedule(static) private(j, dx, dy, dz, ir) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two) shared(p, f, q1, xyz0, xyz1, cutoff)
+    for (j = 0; j < n1; ++j)
+    {
+      dx = xyz0[i*3+0] - xyz1[j*3+0];
+      dy = xyz0[i*3+1] - xyz1[j*3+1];
+      dz = xyz0[i*3+2] - xyz1[j*3+2];
 
-    if ((cutoff > 0 && cutoff > ir) || (cutoff < 0 && -cutoff < ir)) continue;
+      ir = 1.0 / fcs_sqrt(z_sqr(dx) + z_sqr(dy) + z_sqr(dz));
 
-    p[i] += q1[j] * ir;
+      if ((cutoff > 0 && cutoff > ir) || (cutoff < 0 && -cutoff < ir)) continue;
 
-    f[i*3+0] += q1[j] * dx * ir * ir * ir;
-    f[i*3+1] += q1[j] * dy * ir * ir * ir;
-    f[i*3+2] += q1[j] * dz * ir * ir * ir;
+      p_sum += q1[j] * ir;
+
+      f_sum_zero += q1[j] * dx * ir * ir * ir;
+      f_sum_one += q1[j] * dy * ir * ir * ir;
+      f_sum_two += q1[j] * dz * ir * ir * ir;
+    }
+
+#pragma omp critical
+    {
+      p[i] += p_sum;
+
+      f[i*3+0] += f_sum_zero;
+      f[i*3+1] += f_sum_one;
+      f[i*3+2] += f_sum_two;
+    }
   }
 }
 

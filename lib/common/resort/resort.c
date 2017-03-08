@@ -447,6 +447,8 @@ static void resort_ints(fcs_resort_t resort, fcs_int *src, fcs_int *dst, fcs_int
   size_t type_size = sizeof(fcs_resort_index_t) + x * sizeof(fcs_int);
 
   MPI_Datatype type;
+  int comm_rank, comm_size;
+  
   int lengths[2] = { 1, x };
   MPI_Aint displs[2] = { 0, sizeof(fcs_resort_index_t) };
   MPI_Datatype types[2] = { FCS_MPI_RESORT_INDEX, FCS_MPI_INT };
@@ -457,6 +459,8 @@ static void resort_ints(fcs_resort_t resort, fcs_int *src, fcs_int *dst, fcs_int
   double t[4] = { 0, 0, 0, 0 };
 #endif
 
+  MPI_Comm_size(comm, &comm_size);
+  MPI_Comm_rank(comm, &comm_rank);
 
   TIMING_SYNC(comm); TIMING_START(t[0]);
 
@@ -524,6 +528,8 @@ static void resort_floats(fcs_resort_t resort, fcs_float *src, fcs_float *dst, f
   size_t type_size = sizeof(fcs_resort_index_t) + x * sizeof(fcs_float);
 
   MPI_Datatype type;
+  int comm_rank, comm_size;
+  
   int lengths[2] = { 1, x };
   MPI_Aint displs[2] = { 0, sizeof(fcs_resort_index_t) };
   MPI_Datatype types[2] = { FCS_MPI_RESORT_INDEX, FCS_MPI_FLOAT };
@@ -534,7 +540,9 @@ static void resort_floats(fcs_resort_t resort, fcs_float *src, fcs_float *dst, f
   double t[4] = { 0, 0, 0, 0 };
 #endif
 
-
+  MPI_Comm_size(comm, &comm_size);
+  MPI_Comm_rank(comm, &comm_rank);
+  
   TIMING_SYNC(comm); TIMING_START(t[0]);
 
   send = malloc(resort->noriginal_particles * type_size);
@@ -595,6 +603,8 @@ static void resort_bytes(fcs_resort_t resort, void *src, void *dst, fcs_int x, M
   size_t type_size = sizeof(fcs_resort_index_t) + x * sizeof(char);
 
   MPI_Datatype type;
+  int comm_rank, comm_size;
+  
   int lengths[2] = { 1, x };
   MPI_Aint displs[2] = { 0, sizeof(fcs_resort_index_t) };
   MPI_Datatype types[2] = { FCS_MPI_RESORT_INDEX, MPI_BYTE };
@@ -605,6 +615,8 @@ static void resort_bytes(fcs_resort_t resort, void *src, void *dst, fcs_int x, M
   double t[4] = { 0, 0, 0, 0 };
 #endif
 
+  MPI_Comm_size(comm, &comm_size);
+  MPI_Comm_rank(comm, &comm_rank);
 
   TIMING_SYNC(comm); TIMING_START(t[0]);
 

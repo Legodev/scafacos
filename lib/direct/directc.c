@@ -84,16 +84,16 @@
 #define TIMING_STOP(_t_)           TIMING_CMD(((_t_) = MPI_Wtime() - (_t_));)
 #define TIMING_STOP_ADD(_t_, _r_)  TIMING_CMD(((_r_) += MPI_Wtime() - (_t_));)
 
+#ifdef FCS_ENABLE_OFFLOADING
 // defines for MIC Offloading
 #define ALLOC alloc_if(1) free_if(0)
 #define FREE alloc_if(0) free_if(1)
 #define REUSE alloc_if(0) free_if(0)
-/*
-#define ALLOC   alloc_if(1)
-#define FREE    free_if(1)
-#define RETAIN  free_if(0)
-#define REUSE   alloc_if(0)
-*/
+// define attribut for offloadable functions
+#define MICTARGETATTRIBUTE __attribute__((target(mic)))
+#else
+#define MICTARGETATTRIBUTE
+#endif
 
 void fcs_directc_create(fcs_directc_t *directc)
 {
@@ -271,7 +271,7 @@ static void directc_print_particles(fcs_int n, fcs_float *xyz, fcs_float *q, fcs
 #endif
 
 
-static void __attribute__((target(mic))) directc_local_one(fcs_int nout, fcs_int nin, fcs_float *xyz, fcs_float *q, fcs_float *f, fcs_float *p, fcs_float cutoff)
+static void MICTARGETATTRIBUTE directc_local_one(fcs_int nout, fcs_int nin, fcs_float *xyz, fcs_float *q, fcs_float *f, fcs_float *p, fcs_float cutoff)
 {
   fcs_int i, j;
   fcs_float dx, dy, dz, ir;
@@ -341,7 +341,7 @@ static void __attribute__((target(mic))) directc_local_one(fcs_int nout, fcs_int
 }
 
 
-static void __attribute__((target(mic))) directc_local_two(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, fcs_float *xyz1, fcs_float *q1, fcs_float *f, fcs_float *p, fcs_float cutoff)
+static void MICTARGETATTRIBUTE directc_local_two(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, fcs_float *xyz1, fcs_float *q1, fcs_float *f, fcs_float *p, fcs_float cutoff)
 {
   fcs_int i, j;
   fcs_float dx, dy, dz, ir;
@@ -387,7 +387,7 @@ static void __attribute__((target(mic))) directc_local_two(fcs_int n0, fcs_float
   }
 }
 
-static void __attribute__((target(mic))) directc_local_periodic (fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, fcs_float *xyz1, fcs_float *q1, fcs_float *f, fcs_float *p, fcs_int *periodic, fcs_float *box_a, fcs_float *box_b, fcs_float *box_c, fcs_float cutoff)
+static void MICTARGETATTRIBUTE directc_local_periodic (fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, fcs_float *xyz1, fcs_float *q1, fcs_float *f, fcs_float *p, fcs_int *periodic, fcs_float *box_a, fcs_float *box_b, fcs_float *box_c, fcs_float cutoff)
 {
   fcs_int i, j, pd_x, pd_y, pd_z;
   fcs_float dx, dy, dz, ir;
@@ -498,7 +498,7 @@ static void directc_global(fcs_directc_t *directc, fcs_int *periodic, int size, 
    * directc_box_c                  unmodified      array(3)
    * directc_cutoff                   modified      value
    */
-
+#ifdef FCS_ENABLE_OFFLOADING
 #pragma offload target(mic:0) in(directc_nparticles: ALLOC) \
 			      in(directc_positions:length(directc_nparticles * 3) ALLOC) \
 			      in(directc_charges:length(directc_nparticles) ALLOC) \
@@ -512,6 +512,7 @@ static void directc_global(fcs_directc_t *directc, fcs_int *periodic, int size, 
 			      in(directc_field:length(directc_nparticles * 3) ALLOC) \
 			      in(directc_potentials:length(directc_nparticles) ALLOC) \
 			      in(directc_cutoff: ALLOC)
+#endif
   {
   /* directc_nparticles         unmodified      value
    * other_n                    unmodified      value
@@ -550,6 +551,7 @@ static void directc_global(fcs_directc_t *directc, fcs_int *periodic, int size, 
     other_xyz = other_xyzq;
     other_q = other_xyzq + 3 * other_n;
 
+#ifdef FCS_ENABLE_OFFLOADING
 #pragma offload target(mic:0) nocopy(directc_nparticles: REUSE) \
 			      nocopy(directc_positions:length(directc_nparticles * 3) REUSE) \
 			      nocopy(directc_charges:length(directc_nparticles) REUSE) \
@@ -563,6 +565,7 @@ static void directc_global(fcs_directc_t *directc, fcs_int *periodic, int size, 
 			      nocopy(directc_field:length(directc_nparticles * 3) REUSE) \
 			      nocopy(directc_potentials:length(directc_nparticles) REUSE) \
 			      nocopy(directc_cutoff: REUSE)
+#endif
      {
       /* directc_nparticles             unmodified      value
        * directc_positions              unmodified      array(directc_nparticles * 3)
@@ -593,6 +596,7 @@ static void directc_global(fcs_directc_t *directc, fcs_int *periodic, int size, 
     }
   }
 
+#ifdef FCS_ENABLE_OFFLOADING
 #pragma offload_transfer target(mic:0) nocopy(directc_nparticles: FREE) \
 			      nocopy(directc_positions:length(directc_nparticles * 3) FREE) \
 			      nocopy(directc_charges:length(directc_nparticles) FREE) \
@@ -606,6 +610,7 @@ static void directc_global(fcs_directc_t *directc, fcs_int *periodic, int size, 
 			      out(directc_field:length(directc_nparticles * 3) FREE) \
 			      out(directc_potentials:length(directc_nparticles) FREE) \
 			      nocopy(directc_cutoff: FREE)
+#endif
 
   free(other_xyzq);
 }

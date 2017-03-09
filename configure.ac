@@ -182,6 +182,7 @@ if test "x$enable_xeonphi_offloading" = xyes ; then
   AC_MSG_CHECKING([for openmp])
   AC_MSG_RESULT($enable_openmp)
   if test "x$enable_openmp" = xyes ; then
+    AC_DEFINE([FCS_ENABLE_OFFLOADING], [1],[Define if offloading code sould be enabled.])
     AC_MSG_NOTICE([enabled Intel Xeon Phi offloading])
     AC_MSG_WARN([support not finished])
   else

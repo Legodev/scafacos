@@ -703,8 +703,10 @@ void fcs_directc_run(fcs_directc_t *directc, MPI_Comm comm)
     }
   );
 
+#ifdef FCS_ENABLE_OFFLOADING
 // initialize mic offloading
 #pragma offload_transfer target(mic)
+#endif
 
   periodic[0] = directc->periodicity[0] * directc->periodic_images[0];
   periodic[1] = directc->periodicity[1] * directc->periodic_images[1];

@@ -289,7 +289,7 @@ static void MICTARGETATTRIBUTE directc_local_one(fcs_int nout, fcs_int nin, fcs_
     f_sum_two = 0.0;
 
 // parallelizable
-#pragma omp parallel for schedule(static) private(j, dx, dy, dz, ir) shared(i, p, f, q, xyz, cutoff) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two)
+#pragma omp parallel for schedule(static) private(j, dx, dy, dz, ir) firstprivate(i, q, xyz, cutoff) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two)
     for (j = i + 1; j < nout; ++j)
     {
       dx = xyz[i*3+0] - xyz[j*3+0];
@@ -312,7 +312,7 @@ static void MICTARGETATTRIBUTE directc_local_one(fcs_int nout, fcs_int nin, fcs_
       f[j*3+2] -= q[i] * dz * ir * ir * ir;
     }
 
-#pragma omp parallel for schedule(static) private(j, dx, dy, dz, ir) shared(i, p, f, q, xyz, cutoff) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two)
+#pragma omp parallel for schedule(static) private(j, dx, dy, dz, ir) firstprivate(i, q, xyz, cutoff) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two)
     for (j = nout; j < nin; ++j)
     {
       dx = xyz[i*3+0] - xyz[j*3+0];
@@ -350,7 +350,7 @@ static void MICTARGETATTRIBUTE directc_local_two(fcs_int n0, fcs_float *xyz0, fc
 
   if (fcs_fabs(cutoff) > 0) cutoff = 1.0 / cutoff;
 
-#pragma omp parallel for schedule(static) private(i, j, dx, dy, dz, ir, p_sum, f_sum_zero, f_sum_one, f_sum_two) shared(p, f, q1, xyz0, xyz1, cutoff)
+#pragma omp parallel for schedule(static) private(i, j, dx, dy, dz, ir, p_sum, f_sum_zero, f_sum_one, f_sum_two) firstprivate(q1, xyz0, xyz1, cutoff) shared(p, f)
   for (i = 0; i < n0; ++i)
   {
     p_sum = 0.0;
@@ -358,7 +358,7 @@ static void MICTARGETATTRIBUTE directc_local_two(fcs_int n0, fcs_float *xyz0, fc
     f_sum_one = 0.0;
     f_sum_two = 0.0;
 
-#pragma omp parallel for schedule(static) private(j, dx, dy, dz, ir) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two) shared(p, f, q1, xyz0, xyz1, cutoff)
+#pragma omp parallel for schedule(static) private(j, dx, dy, dz, ir) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two) firstprivate(xyz0, xyz1, cutoff)
     for (j = 0; j < n1; ++j)
     {
       dx = xyz0[i*3+0] - xyz1[j*3+0];
@@ -396,7 +396,7 @@ static void MICTARGETATTRIBUTE directc_local_periodic (fcs_int n0, fcs_float *xy
   if (fcs_fabs(cutoff) > 0)
     cutoff = 1.0 / cutoff;
 
-#pragma omp parallel for schedule(static) private(i, j, pd_x, pd_y, pd_z, dx, dy, dz, ir, p_sum, f_sum_zero, f_sum_one, f_sum_two) shared(p, f, q1, xyz0, xyz1, box_a, box_b, box_c, cutoff)
+#pragma omp parallel for schedule(static) private(i, j, pd_x, pd_y, pd_z, dx, dy, dz, ir, p_sum, f_sum_zero, f_sum_one, f_sum_two) firstprivate(q1, xyz0, xyz1, box_a, box_b, box_c, cutoff) shared(p, f)
   for (i = 0; i < n0; ++i)
   {
     p_sum = 0.0;
@@ -404,7 +404,7 @@ static void MICTARGETATTRIBUTE directc_local_periodic (fcs_int n0, fcs_float *xy
     f_sum_one = 0.0;
     f_sum_two = 0.0;
 
-#pragma omp parallel for schedule(static) collapse(4) private(j, pd_x, pd_y, pd_z, dx, dy, dz, ir) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two) shared(p, f, q1, xyz0, xyz1, box_a, box_b, box_c, cutoff)
+#pragma omp parallel for schedule(static) collapse(4) private(j, pd_x, pd_y, pd_z, dx, dy, dz, ir) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two) firstprivate(q1, xyz0, xyz1, box_a, box_b, box_c, cutoff)
     for (j = 0; j < n1; ++j)
     for (pd_x = -periodic[0]; pd_x <= periodic[0]; ++pd_x)
     for (pd_y = -periodic[1]; pd_y <= periodic[1]; ++pd_y)

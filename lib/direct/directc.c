@@ -271,7 +271,13 @@ static void directc_print_particles(fcs_int n, fcs_float *xyz, fcs_float *q, fcs
 #endif
 
 
-static void MICTARGETATTRIBUTE directc_local_one(fcs_int nout, fcs_int nin, fcs_float *xyz, fcs_float *q, fcs_float *f, fcs_float *p, fcs_float cutoff)
+static void
+#ifdef FCS_ENABLE_OFFLOADING
+#ifdef __INTEL_COMPILER
+__attribute__((target(mic)))
+#endif
+#endif
+directc_local_one(fcs_int nout, fcs_int nin, fcs_float *xyz, fcs_float *q, fcs_float *f, fcs_float *p, fcs_float cutoff)
 {
   fcs_int i, j;
   fcs_float dx, dy, dz, ir;
@@ -341,7 +347,13 @@ static void MICTARGETATTRIBUTE directc_local_one(fcs_int nout, fcs_int nin, fcs_
 }
 
 
-static void MICTARGETATTRIBUTE directc_local_two(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, fcs_float *xyz1, fcs_float *q1, fcs_float *f, fcs_float *p, fcs_float cutoff)
+static void
+#ifdef FCS_ENABLE_OFFLOADING
+#ifdef __INTEL_COMPILER
+__attribute__((target(mic)))
+#endif
+#endif
+directc_local_two(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, fcs_float *xyz1, fcs_float *q1, fcs_float *f, fcs_float *p, fcs_float cutoff)
 {
   fcs_int i, j;
   fcs_float dx, dy, dz, ir;
@@ -387,7 +399,13 @@ static void MICTARGETATTRIBUTE directc_local_two(fcs_int n0, fcs_float *xyz0, fc
   }
 }
 
-static void MICTARGETATTRIBUTE directc_local_periodic (fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, fcs_float *xyz1, fcs_float *q1, fcs_float *f, fcs_float *p, fcs_int *periodic, fcs_float *box_a, fcs_float *box_b, fcs_float *box_c, fcs_float cutoff)
+static void
+#ifdef FCS_ENABLE_OFFLOADING
+#ifdef __INTEL_COMPILER
+__attribute__((target(mic)))
+#endif
+#endif
+directc_local_periodic (fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, fcs_float *xyz1, fcs_float *q1, fcs_float *f, fcs_float *p, fcs_int *periodic, fcs_float *box_a, fcs_float *box_b, fcs_float *box_c, fcs_float cutoff)
 {
   fcs_int i, j, pd_x, pd_y, pd_z;
   fcs_float dx, dy, dz, ir;
@@ -499,6 +517,7 @@ static void directc_global(fcs_directc_t *directc, fcs_int *periodic, int size, 
    * directc_cutoff                   modified      value
    */
 #ifdef FCS_ENABLE_OFFLOADING
+#ifdef __INTEL_COMPILER
 #pragma offload target(mic:0) in(directc_nparticles: ALLOC) \
 			      in(directc_positions:length(directc_nparticles * 3) ALLOC) \
 			      in(directc_charges:length(directc_nparticles) ALLOC) \
@@ -512,6 +531,7 @@ static void directc_global(fcs_directc_t *directc, fcs_int *periodic, int size, 
 			      in(directc_field:length(directc_nparticles * 3) ALLOC) \
 			      in(directc_potentials:length(directc_nparticles) ALLOC) \
 			      in(directc_cutoff: ALLOC)
+#endif
 #endif
   {
   /* directc_nparticles         unmodified      value
@@ -552,6 +572,7 @@ static void directc_global(fcs_directc_t *directc, fcs_int *periodic, int size, 
     other_q = other_xyzq + 3 * other_n;
 
 #ifdef FCS_ENABLE_OFFLOADING
+#ifdef __INTEL_COMPILER
 #pragma offload target(mic:0) nocopy(directc_nparticles: REUSE) \
 			      nocopy(directc_positions:length(directc_nparticles * 3) REUSE) \
 			      nocopy(directc_charges:length(directc_nparticles) REUSE) \
@@ -565,6 +586,7 @@ static void directc_global(fcs_directc_t *directc, fcs_int *periodic, int size, 
 			      nocopy(directc_field:length(directc_nparticles * 3) REUSE) \
 			      nocopy(directc_potentials:length(directc_nparticles) REUSE) \
 			      nocopy(directc_cutoff: REUSE)
+#endif
 #endif
      {
       /* directc_nparticles             unmodified      value
@@ -597,6 +619,7 @@ static void directc_global(fcs_directc_t *directc, fcs_int *periodic, int size, 
   }
 
 #ifdef FCS_ENABLE_OFFLOADING
+#ifdef __INTEL_COMPILER
 #pragma offload_transfer target(mic:0) nocopy(directc_nparticles: FREE) \
 			      nocopy(directc_positions:length(directc_nparticles * 3) FREE) \
 			      nocopy(directc_charges:length(directc_nparticles) FREE) \
@@ -610,6 +633,7 @@ static void directc_global(fcs_directc_t *directc, fcs_int *periodic, int size, 
 			      out(directc_field:length(directc_nparticles * 3) FREE) \
 			      out(directc_potentials:length(directc_nparticles) FREE) \
 			      nocopy(directc_cutoff: FREE)
+#endif
 #endif
 
   free(other_xyzq);

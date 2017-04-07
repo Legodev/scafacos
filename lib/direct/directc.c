@@ -422,7 +422,6 @@ directc_local_periodic (fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, 
   fcs_int * pd_y_array = calloc(roundsize, sizeof(fcs_int));
   fcs_int * pd_z_array = calloc(roundsize, sizeof(fcs_int));
 
-#pragma omp parallel for schedule(static) private(pd_x, pd_y, pd_z) firstprivate(pd_x_array, pd_y_array, pd_z_array)
   for (pd_x = -periodic[0]; pd_x <= periodic[0]; ++pd_x)
   for (pd_y = -periodic[1]; pd_y <= periodic[1]; ++pd_y)
   for (pd_z = -periodic[2]; pd_z <= periodic[2]; ++pd_z)

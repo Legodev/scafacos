@@ -295,7 +295,7 @@ directc_local_one(fcs_int nout, fcs_int nin, fcs_float *xyz, fcs_float *q, fcs_f
     f_sum_two = 0.0;
 
 // parallelizable
-#pragma omp parallel for simd schedule(static) private(j, dx, dy, dz, ir) firstprivate(i, q, xyz, cutoff) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two)
+#pragma omp parallel for schedule(static) private(j, dx, dy, dz, ir) firstprivate(i, q, xyz, cutoff) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two)
     for (j = i + 1; j < nout; ++j)
     {
       dx = xyz[i*3+0] - xyz[j*3+0];
@@ -318,7 +318,7 @@ directc_local_one(fcs_int nout, fcs_int nin, fcs_float *xyz, fcs_float *q, fcs_f
       f[j*3+2] -= q[i] * dz * ir * ir * ir;
     }
 
-#pragma omp parallel for simd schedule(static) private(j, dx, dy, dz, ir) firstprivate(i, q, xyz, cutoff) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two)
+#pragma omp parallel for schedule(static) private(j, dx, dy, dz, ir) firstprivate(i, q, xyz, cutoff) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two)
     for (j = nout; j < nin; ++j)
     {
       dx = xyz[i*3+0] - xyz[j*3+0];
@@ -370,7 +370,7 @@ directc_local_two(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, fcs_fl
     f_sum_one = 0.0;
     f_sum_two = 0.0;
 
-#pragma omp parallel for simd schedule(static) private(j, dx, dy, dz, ir) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two) firstprivate(xyz0, xyz1, cutoff)
+#pragma omp parallel for schedule(static) private(j, dx, dy, dz, ir) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two) firstprivate(xyz0, xyz1, cutoff)
     for (j = 0; j < n1; ++j)
     {
       dx = xyz0[i*3+0] - xyz1[j*3+0];
@@ -405,6 +405,79 @@ static void
 __attribute__((target(mic)))
 #endif
 #endif
+#define FCS_ENABLE_INTRINSIC
+#ifdef FCS_ENABLE_INTRINSIC
+directc_local_periodic (fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, fcs_float *xyz1, fcs_float *q1, fcs_float *f, fcs_float *p, fcs_int *periodic, fcs_float *box_a, fcs_float *box_b, fcs_float *box_c, fcs_float cutoff)
+{
+  fcs_int i, j, pd_x, pd_y, pd_z;
+  fcs_float dx, dy, dz, ir;
+  fcs_float p_sum, f_sum_zero, f_sum_one, f_sum_two;
+
+  if (fcs_fabs(cutoff) > 0)
+    cutoff = 1.0 / cutoff;
+
+  unsigned fcs_int roundsize = (2 * periodic[0] + 1) * (2 * periodic[1] + 1) * (2 * periodic[2] + 1) - 1;
+  unsigned fcs_int roundpos = 0;
+  fcs_int * pd_x_array = calloc(roundsize, sizeof(fcs_int));
+  fcs_int * pd_y_array = calloc(roundsize, sizeof(fcs_int));
+  fcs_int * pd_z_array = calloc(roundsize, sizeof(fcs_int));
+
+  for (pd_x = -periodic[0]; pd_x <= periodic[0]; ++pd_x)
+  for (pd_y = -periodic[1]; pd_y <= periodic[1]; ++pd_y)
+  for (pd_z = -periodic[2]; pd_z <= periodic[2]; ++pd_z)
+  {
+    if (pd_x == 0 && pd_y == 0 && pd_z == 0)
+	continue;
+
+    pd_x_array[roundpos] = pd_x;
+    pd_y_array[roundpos] = pd_y;
+    pd_z_array[roundpos] = pd_z;
+    printf("%f - %f - %f - %d\n", (float)pd_x_array[roundpos], (float)pd_y_array[roundpos], (float)pd_z_array[roundpos], roundsize);
+    roundpos++;
+  }
+
+
+#pragma omp parallel for schedule(static) private(i, j, pd_x, pd_y, pd_z, dx, dy, dz, ir, roundpos, p_sum, f_sum_zero, f_sum_one, f_sum_two) firstprivate(q1, xyz0, xyz1, box_a, box_b, box_c, cutoff, roundsize, pd_x_array, pd_y_array, pd_z_array) shared(p, f)
+  for (i = 0; i < n0; ++i)
+  {
+    p_sum = 0.0;
+    f_sum_zero = 0.0;
+    f_sum_one = 0.0;
+    f_sum_two = 0.0;
+
+#pragma omp parallel for schedule(static) private(j, pd_x, pd_y, pd_z, dx, dy, dz, ir, roundpos) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two) firstprivate(q1, xyz0, xyz1, box_a, box_b, box_c, cutoff, roundsize, pd_x_array, pd_y_array, pd_z_array)
+    for (j = 0; j < n1; ++j)
+    {
+      for (roundpos = 0; roundpos < roundsize; roundpos++)
+      {
+        dx = xyz0[i * 3 + 0] - xyz1[j * 3 + 0] - (pd_x_array[roundpos] * box_a[0]) - (pd_y_array[roundpos] * box_b[0]) - (pd_z_array[roundpos] * box_c[0]);
+        dy = xyz0[i * 3 + 1] - xyz1[j * 3 + 1] - (pd_x_array[roundpos] * box_a[1]) - (pd_y_array[roundpos] * box_b[1]) - (pd_z_array[roundpos] * box_c[1]);
+        dz = xyz0[i * 3 + 2] - xyz1[j * 3 + 2] - (pd_x_array[roundpos] * box_a[2]) - (pd_y_array[roundpos] * box_b[2]) - (pd_z_array[roundpos] * box_c[2]);
+
+	ir = 1.0 / fcs_sqrt(z_sqr(dx) + z_sqr(dy) + z_sqr(dz));
+
+	if ((cutoff > 0 && cutoff > ir) || (cutoff < 0 && -cutoff < ir))
+	  continue;
+
+	p_sum += q1[j] * ir;
+
+	f_sum_zero += q1[j] * dx * ir * ir * ir;
+	f_sum_one += q1[j] * dy * ir * ir * ir;
+	f_sum_two += q1[j] * dz * ir * ir * ir;
+      }
+    }
+
+#pragma omp critical
+    {
+      p[i] += p_sum;
+
+      f[i * 3 + 0] += f_sum_zero;
+      f[i * 3 + 1] += f_sum_one;
+      f[i * 3 + 2] += f_sum_two;
+    }
+  }
+}
+#else
 directc_local_periodic (fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, fcs_float *xyz1, fcs_float *q1, fcs_float *f, fcs_float *p, fcs_int *periodic, fcs_float *box_a, fcs_float *box_b, fcs_float *box_c, fcs_float cutoff)
 {
   fcs_int i, j, pd_x, pd_y, pd_z;
@@ -458,7 +531,7 @@ directc_local_periodic (fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, 
     }
   }
 }
-
+#endif
 
 
 static void directc_global(fcs_directc_t *directc, fcs_int *periodic, int size, int rank, MPI_Comm comm)

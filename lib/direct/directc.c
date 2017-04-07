@@ -477,6 +477,9 @@ directc_local_periodic (fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, 
       f[i * 3 + 2] += f_sum_two;
     }
   }
+  free(pd_x_array);
+  free(pd_y_array);
+  free(pd_z_array);
 }
 #else
 directc_local_periodic (fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, fcs_float *xyz1, fcs_float *q1, fcs_float *f, fcs_float *p, fcs_int *periodic, fcs_float *box_a, fcs_float *box_b, fcs_float *box_c, fcs_float cutoff)

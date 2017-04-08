@@ -473,11 +473,14 @@ directc_local_periodic (fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, 
 	if ((cutoff > 0 && cutoff > ir) || (cutoff < 0 && -cutoff < ir))
 	  continue;
 
-	p_sum += q1[j] * ir;
+	fcs_float temptest = q1[j] * ir;
+	p_sum += temptest;
 
-	f_sum_zero += q1[j] * dx * ir * ir * ir;
-	f_sum_one += q1[j] * dy * ir * ir * ir;
-	f_sum_two += q1[j] * dz * ir * ir * ir;
+	temptest *= ir * ir;
+	p_sum += temptest;
+	f_sum_zero += temptest * dx;
+	f_sum_one += temptest * dy;
+	f_sum_two += temptest * dz;
       }
 
     }
@@ -522,7 +525,7 @@ directc_local_periodic (fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, 
     for (j = 0; j < n1; ++j)
     for (pd_x = -periodic[0]; pd_x <= periodic[0]; ++pd_x)
     for (pd_y = -periodic[1]; pd_y <= periodic[1]; ++pd_y)
-#pragma simd private(pd_z, dx, dy, dz, ir) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two) firstprivate(pd_x, pd_y, j, q1, xyz0, xyz1, box_a, box_b, box_c, cutoff)
+#pragma simd private(dx, dy, dz, ir) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two) firstprivate(pd_x, pd_y, j, q1, xyz0, xyz1, box_a, box_b, box_c, cutoff)
     for (pd_z = -periodic[2]; pd_z <= periodic[2]; ++pd_z)
     {
       if (pd_x == 0 && pd_y == 0 && pd_z == 0)

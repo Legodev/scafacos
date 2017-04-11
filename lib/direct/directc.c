@@ -432,7 +432,13 @@ directc_local_periodic (fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, 
     pd_x_array[roundpos] = pd_x;
     pd_y_array[roundpos] = pd_y;
     pd_z_array[roundpos] = pd_z;
-    printf("%f - %f - %f - %d - %d\n", (float)pd_x_array[roundpos], (float)pd_y_array[roundpos], (float)pd_z_array[roundpos], roundpos, roundsize);
+
+#ifdef PRINT_PARTICLES
+#ifndef __MIC__
+    printf("%d - %d - %d - %d - %d\n", (int)pd_x_array[roundpos], (int)pd_y_array[roundpos], (int)pd_z_array[roundpos], roundpos, roundsize);
+#endif
+#endif
+
     roundpos++;
   }
 
@@ -477,7 +483,6 @@ directc_local_periodic (fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, 
 	p_sum += temptest;
 
 	temptest *= ir * ir;
-	p_sum += temptest;
 	f_sum_zero += temptest * dx;
 	f_sum_one += temptest * dy;
 	f_sum_two += temptest * dz;

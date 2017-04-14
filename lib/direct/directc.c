@@ -461,34 +461,24 @@ directc_local_periodic (fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, 
 
 #pragma omp parallel num_threads(4)
       {
-        fcs_float dx_array[32] __attribute__((aligned(64)));
-        fcs_float dy_array[32] __attribute__((aligned(64)));
-        fcs_float dz_array[32] __attribute__((aligned(64)));
 
 #pragma omp for schedule(static) private(j, pd_x, pd_y, pd_z, dx, dy, dz, ir, roundpos) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two) firstprivate(q1, xyz0, xyz1, box_a, box_b, box_c, cutoff, roundsize, pd_x_array, pd_y_array, pd_z_array)
         for (j = 0; j < n1; ++j)
         {
           for (roundpos = 0; roundpos < roundsize; roundpos++)
           {
-            dx_array[roundpos] = xyz0[i * 3 + 0] - xyz1[j * 3 + 0]
+            dx = xyz0[i * 3 + 0] - xyz1[j * 3 + 0]
                 - (pd_x_array[roundpos] * box_a[0])
                 - (pd_y_array[roundpos] * box_b[0])
                 - (pd_z_array[roundpos] * box_c[0]);
-            dy_array[roundpos] = xyz0[i * 3 + 1] - xyz1[j * 3 + 1]
+            dy = xyz0[i * 3 + 1] - xyz1[j * 3 + 1]
                 - (pd_x_array[roundpos] * box_a[1])
                 - (pd_y_array[roundpos] * box_b[1])
                 - (pd_z_array[roundpos] * box_c[1]);
-            dz_array[roundpos] = xyz0[i * 3 + 2] - xyz1[j * 3 + 2]
+            dz = xyz0[i * 3 + 2] - xyz1[j * 3 + 2]
                 - (pd_x_array[roundpos] * box_a[2])
                 - (pd_y_array[roundpos] * box_b[2])
                 - (pd_z_array[roundpos] * box_c[2]);
-//		    }
-//
-//		  for (roundpos = 0; roundpos < roundsize; roundpos++)
-//		    {
-            dx = dx_array[roundpos];
-            dy = dy_array[roundpos];
-            dz = dz_array[roundpos];
 
             ir = 1.0 / fcs_sqrt(z_sqr(dx) + z_sqr(dy) + z_sqr(dz));
 

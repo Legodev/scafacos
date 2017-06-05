@@ -92,7 +92,9 @@
 
 #ifdef FCS_ENABLE_OFFLOADING
 // defines for MIC Offloading
-#define ALLOC alloc_if(1) free_if(0)
+// align(64) possibly slows down data transfer from cpu -> coprocessor but makes sure that the data is aligned
+// TODO: align data in library to remove the need of align(64)
+#define ALLOC alloc_if(1) free_if(0) align(64)
 #define FREE alloc_if(0) free_if(1)
 #define REUSE alloc_if(0) free_if(0)
 // define attribut for offloadable functions
@@ -289,6 +291,13 @@ directc_local_one(fcs_int nout, fcs_int nin, fcs_float *xyz, fcs_float *q, fcs_f
   fcs_float dx, dy, dz, ir;
   fcs_float p_sum, f_sum_zero, f_sum_one, f_sum_two;
 
+#ifdef __MIC__
+  __assume_aligned(xyz, 64);
+  __assume_aligned(q, 64);
+  __assume_aligned(f, 64);
+  __assume_aligned(p, 64);
+#endif
+
   // use static, more optimized code if cutoff is 0 (or at least very close to)
   if (fcs_fabs(cutoff) < 0.000000001) {
 
@@ -434,6 +443,15 @@ directc_local_two(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, fcs_fl
   fcs_float dx, dy, dz, ir;
   fcs_float p_sum, f_sum_zero, f_sum_one, f_sum_two;
 
+#ifdef __MIC__
+  __assume_aligned(xyz0, 64);
+  __assume_aligned(q0, 64);
+  __assume_aligned(xyz1, 64);
+  __assume_aligned(q1, 64);
+  __assume_aligned(f, 64);
+  __assume_aligned(p, 64);
+#endif
+
   // use static, more optimized code if cutoff is 0 (or at least very close to)
   if (fcs_fabs(cutoff) < 0.000000001) {
 #pragma omp parallel for schedule(static) private(i, j, dx, dy, dz, ir, p_sum, f_sum_zero, f_sum_one, f_sum_two) firstprivate(q1, xyz0, xyz1, cutoff) shared(p, f)
@@ -531,6 +549,18 @@ directc_local_periodic (fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, 
 
   unsigned fcs_int roundsize = (2 * periodic[0] + 1) * (2 * periodic[1] + 1) * (2 * periodic[2] + 1) - 1;
   unsigned fcs_int roundpos = 0;
+
+#ifdef __MIC__
+  __assume_aligned(xyz0, 64);
+  __assume_aligned(q0, 64);
+  __assume_aligned(xyz1, 64);
+  __assume_aligned(q1, 64);
+  __assume_aligned(f, 64);
+  __assume_aligned(p, 64);
+  __assume_aligned(box_a, 64);
+  __assume_aligned(box_b, 64);
+  __assume_aligned(box_c, 64);
+#endif
 
 // use static, more optimized code if cutoff is 0 (or at least very close to) and
 // the periodicity is less or equal (1, 1, 1)
@@ -944,9 +974,9 @@ printf("\n\nDATATYPE: %s\n\n\n", STR(fcs_float));
 #pragma offload target(mic:0) in(directc_nparticles: ALLOC) \
                               in(directc_positions:length(directc_nparticles * 3) ALLOC) \
                               in(directc_charges:length(directc_nparticles) ALLOC) \
-                              in(other_n:ALLOC) \
-                              in(other_xyz:length(directc_nparticles * 3) ALLOC) \
-                              in(other_q:length(directc_nparticles) ALLOC) \
+							                inout(other_n:ALLOC) \
+											        inout(other_xyz:length(directc_nparticles * 3) ALLOC) \
+													    inout(other_q:length(directc_nparticles) ALLOC) \
                               in(periodic:length(3) ALLOC) \
                               in(directc_box_a:length(3) ALLOC) \
                               in(directc_box_b:length(3) ALLOC) \
@@ -999,9 +1029,9 @@ printf("\n\nDATATYPE: %s\n\n\n", STR(fcs_float));
 #pragma offload target(mic:0) nocopy(directc_nparticles: REUSE) \
                               nocopy(directc_positions:length(directc_nparticles * 3) REUSE) \
                               nocopy(directc_charges:length(directc_nparticles) REUSE) \
-                              in(other_n:REUSE) \
-                              in(other_xyz:length(directc_nparticles * 3) REUSE) \
-                              in(other_q:length(directc_nparticles) REUSE) \
+                              inout(other_n:REUSE align(64)) \
+                              inout(other_xyz:length(directc_nparticles * 3) REUSE align(64)) \
+                              inout(other_q:length(directc_nparticles) REUSE align(64)) \
                               nocopy(periodic:length(3) REUSE) \
                               nocopy(directc_box_a:length(3) REUSE) \
                               nocopy(directc_box_b:length(3) REUSE) \

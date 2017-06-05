@@ -974,9 +974,9 @@ printf("\n\nDATATYPE: %s\n\n\n", STR(fcs_float));
 #pragma offload target(mic:0) in(directc_nparticles: ALLOC) \
                               in(directc_positions:length(directc_nparticles * 3) ALLOC) \
                               in(directc_charges:length(directc_nparticles) ALLOC) \
-							                inout(other_n:ALLOC) \
-											        inout(other_xyz:length(directc_nparticles * 3) ALLOC) \
-													    inout(other_q:length(directc_nparticles) ALLOC) \
+                              in(other_n:ALLOC) \
+                              in(other_xyz:length(directc_nparticles * 3) ALLOC) \
+                              in(other_q:length(directc_nparticles) ALLOC) \
                               in(periodic:length(3) ALLOC) \
                               in(directc_box_a:length(3) ALLOC) \
                               in(directc_box_b:length(3) ALLOC) \
@@ -1029,9 +1029,9 @@ printf("\n\nDATATYPE: %s\n\n\n", STR(fcs_float));
 #pragma offload target(mic:0) nocopy(directc_nparticles: REUSE) \
                               nocopy(directc_positions:length(directc_nparticles * 3) REUSE) \
                               nocopy(directc_charges:length(directc_nparticles) REUSE) \
-                              inout(other_n:REUSE align(64)) \
-                              inout(other_xyz:length(directc_nparticles * 3) REUSE align(64)) \
-                              inout(other_q:length(directc_nparticles) REUSE align(64)) \
+                              in(other_n:REUSE align(64)) \
+                              in(other_xyz:length(directc_nparticles * 3) REUSE align(64)) \
+                              in(other_q:length(directc_nparticles) REUSE align(64)) \
                               nocopy(periodic:length(3) REUSE) \
                               nocopy(directc_box_a:length(3) REUSE) \
                               nocopy(directc_box_b:length(3) REUSE) \

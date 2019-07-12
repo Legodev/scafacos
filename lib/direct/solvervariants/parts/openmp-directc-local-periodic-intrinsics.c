@@ -33,7 +33,9 @@ directc_local_periodic(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, f
     unsigned fcs_int
     roundpos = 0;
 
+#ifdef DEBUG
     printf("roundsize: %d, roundsizeremainder: %d, roundsizefull: %d\n", roundsize, roundsizeremainder, roundsizefull);
+#endif
 
 // don't try to calculate the periodicity if system is nonperiodic
     if (roundsize > 0) {

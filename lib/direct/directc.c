@@ -292,10 +292,12 @@ static void directc_global(fcs_directc_t *directc, fcs_int *periodic, int size, 
 
   MPI_Status status;
 
+#ifdef DEBUG
 #define QUOTE(name) #name
 #define STR(macro) QUOTE(macro)
 
 printf("\n\nDATATYPE: %s\n\n\n", STR(fcs_float));
+#endif
 
   my_n = directc->nparticles + directc->in_nparticles;
   MPI_Allreduce(&my_n, &max_n, 1, FCS_MPI_INT, MPI_MAX, comm);

@@ -127,54 +127,52 @@ directc_local_periodic(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, f
                             __m512d m512_ir_ir_ir_tmp = _mm512_mul_pd(m512_ir_array,
                                                                       _mm512_mul_pd(m512_ir_array, m512_ir_tmp));
 
-                            //          the following reduce_add produce wrong values including inf and nan dunno why
-#ifndef useworaround
                             p_sum += _mm512_reduce_add_pd(m512_ir_tmp);
                             f_sum_zero += _mm512_reduce_add_pd(_mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dx_array));
                             f_sum_one += _mm512_reduce_add_pd(_mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dy_array));
                             f_sum_two += _mm512_reduce_add_pd(_mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dz_array));
                         }
-#else
-                        // BEGIN WORK AROUND for the non functional reduce_add
-                        _mm512_store_pd(&sum_array[roundpos], m512_ir_tmp);
-                        _mm512_store_pd(&sum_array[roundpos + 32], _mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dx_array));
-                        _mm512_store_pd(&sum_array[roundpos + 64], _mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dy_array));
-                        _mm512_store_pd(&sum_array[roundpos + 96], _mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dz_array));
-                    }
 
-                    for (roundpos = 0; roundpos < roundsizefull; roundpos++) {
-                        f_sum_two += sum_array[roundpos + 96];
-                        f_sum_one += sum_array[roundpos + 64];
-                        f_sum_zero += sum_array[roundpos + 32];
-                        p_sum += sum_array[roundpos];
-                    }
-                    // END WORK AROUND
-#endif
                         if (roundsizeremainder > 0) {
-                            for (roundpos = roundsizefull; roundpos < roundsize; roundpos++) {
-                                dx = xyz0[i * 3 + 0] - xyz1[j * 3 + 0]
-                                     - (pd_x_array[roundpos] * box_a[0])
-                                     - (pd_y_array[roundpos] * box_b[0])
-                                     - (pd_z_array[roundpos] * box_c[0]);
-                                dy = xyz0[i * 3 + 1] - xyz1[j * 3 + 1]
-                                     - (pd_x_array[roundpos] * box_a[1])
-                                     - (pd_y_array[roundpos] * box_b[1])
-                                     - (pd_z_array[roundpos] * box_c[1]);
-                                dz = xyz0[i * 3 + 2] - xyz1[j * 3 + 2]
-                                     - (pd_x_array[roundpos] * box_a[2])
-                                     - (pd_y_array[roundpos] * box_b[2])
-                                     - (pd_z_array[roundpos] * box_c[2]);
+                            __mmask8 _k_mask = (1 << roundsizeremainder) - 1;
+                            __m512d _zeros = _mm512_set1_pd(0);
 
-                                ir = 1.0 / fcs_sqrt(z_sqr(dx) + z_sqr(dy) + z_sqr(dz));
+                            __m512d m512_pd_dx_array = _mm512_mask_load_pd(_zeros, _k_mask, &pd_x_array[roundpos]);
+                            __m512d m512_pd_dy_array = _mm512_mask_load_pd(_zeros, _k_mask, &pd_y_array[roundpos]);
+                            __m512d m512_pd_dz_array = _mm512_mask_load_pd(_zeros, _k_mask, &pd_z_array[roundpos]);
 
-                                fcs_float temptest = q1[j] * ir;
-                                p_sum += temptest;
+                            // dx_array
+                            __m512d m512_dx_array = _mm512_fnmadd_pd(m512_pd_dx_array, m512_box_a0_array,
+                                                                     m512_xyz0_array);
+                            m512_dx_array = _mm512_fnmadd_pd(m512_pd_dy_array, m512_box_b0_array, m512_dx_array);
+                            m512_dx_array = _mm512_fnmadd_pd(m512_pd_dz_array, m512_box_c0_array, m512_dx_array);
 
-                                temptest *= ir * ir;
-                                f_sum_zero += temptest * dx;
-                                f_sum_one += temptest * dy;
-                                f_sum_two += temptest * dz;
-                            }
+                            // dy_array
+                            __m512d m512_dy_array = _mm512_fnmadd_pd(m512_pd_dx_array, m512_box_a1_array,
+                                                                     m512_xyz1_array);
+                            m512_dy_array = _mm512_fnmadd_pd(m512_pd_dy_array, m512_box_b1_array, m512_dy_array);
+                            m512_dy_array = _mm512_fnmadd_pd(m512_pd_dz_array, m512_box_c1_array, m512_dy_array);
+
+                            // dz_array
+                            __m512d m512_dz_array = _mm512_fnmadd_pd(m512_pd_dx_array, m512_box_a2_array,
+                                                                     m512_xyz2_array);
+                            m512_dz_array = _mm512_fnmadd_pd(m512_pd_dy_array, m512_box_b2_array, m512_dz_array);
+                            m512_dz_array = _mm512_fnmadd_pd(m512_pd_dz_array, m512_box_c2_array, m512_dz_array);
+
+                            __m512d m512_ir_array = _mm512_mul_pd(m512_dx_array, m512_dx_array);
+                            m512_ir_array = _mm512_fmadd_pd(m512_dy_array, m512_dy_array, m512_ir_array);
+                            m512_ir_array = _mm512_fmadd_pd(m512_dz_array, m512_dz_array, m512_ir_array);
+                            m512_ir_array = _mm512_invsqrt_pd(m512_ir_array);
+
+                            __m512d m512_ir_tmp = _mm512_mul_pd(m512_q_array, m512_ir_array);
+                            __m512d m512_ir_ir_ir_tmp = _mm512_mul_pd(m512_ir_array,
+                                                                      _mm512_mul_pd(m512_ir_array, m512_ir_tmp));
+
+                            p_sum += _mm512_mask_reduce_add_pd(_k_mask, m512_ir_tmp);
+                            f_sum_zero += _mm512_mask_reduce_add_pd(_k_mask,
+                                                               _mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dx_array));
+                            f_sum_one += _mm512_mask_reduce_add_pd(_k_mask, _mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dy_array));
+                            f_sum_two += _mm512_mask_reduce_add_pd(_k_mask, _mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dz_array));
                         }
                     }
                 }

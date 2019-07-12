@@ -27,7 +27,13 @@ directc_local_periodic(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, f
     unsigned fcs_int
     roundsize = (2 * periodic[0] + 1) * (2 * periodic[1] + 1) * (2 * periodic[2] + 1) - 1;
     unsigned fcs_int
+    roundsizeremainder = roundsize % 8;
+    unsigned fcs_int
+    roundsizefull = roundsize - roundsizeremainder;
+    unsigned fcs_int
     roundpos = 0;
+
+    printf("roundsize: %d, roundsizeremainder: %d, roundsizefull: %d\n", roundsize, roundsizeremainder, roundsizefull);
 
 // don't try to calculate the periodicity if system is nonperiodic
     if (roundsize > 0) {
@@ -68,9 +74,9 @@ directc_local_periodic(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, f
                 {
 #pragma omp parallel for schedule(static) private(j, pd_x, pd_y, pd_z, dx, dy, dz, ir, roundpos) reduction(+:p_sum, f_sum_zero, f_sum_one, f_sum_two) firstprivate(q1, xyz0, xyz1, box_a, box_b, box_c, cutoff, roundsize, pd_x_array, pd_y_array, pd_z_array)
                     for (j = 0; j < n1; ++j) {
-
+#ifdef useworaround
                         fcs_float sum_array[128] __attribute__((aligned(64)));
-
+#endif
                         __m512d m512_xyz0_array = _mm512_set1_pd(xyz0[i * 3 + 0] - xyz1[j * 3 + 0]);
                         __m512d m512_xyz1_array = _mm512_set1_pd(xyz0[i * 3 + 1] - xyz1[j * 3 + 1]);
                         __m512d m512_xyz2_array = _mm512_set1_pd(xyz0[i * 3 + 2] - xyz1[j * 3 + 2]);
@@ -89,7 +95,7 @@ directc_local_periodic(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, f
 
                         __m512d m512_q_array = _mm512_set1_pd(q1[j]);
 
-                        for (roundpos = 0; roundpos < roundsize; roundpos += 8) {
+                        for (roundpos = 0; roundpos < roundsizefull; roundpos += 8) {
                             __m512d m512_pd_dx_array = _mm512_load_pd(&pd_x_array[roundpos]);
                             __m512d m512_pd_dy_array = _mm512_load_pd(&pd_y_array[roundpos]);
                             __m512d m512_pd_dz_array = _mm512_load_pd(&pd_z_array[roundpos]);
@@ -122,54 +128,53 @@ directc_local_periodic(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, f
                                                                       _mm512_mul_pd(m512_ir_array, m512_ir_tmp));
 
                             //          the following reduce_add produce wrong values including inf and nan dunno why
-                            //            p_sum += _mm512_reduce_add_pd(m512_ir_tmp);
-                            //            f_sum_zero += _mm512_reduce_add_pd(_mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dx_array));
-                            //            f_sum_one += _mm512_reduce_add_pd(_mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dy_array));
-                            //            f_sum_two += _mm512_reduce_add_pd(_mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dz_array));
-                            //          }
-
-                            // BEGIN WORK AROUND for the non functional reduce_add
-                            _mm512_store_pd(&sum_array[roundpos], m512_ir_tmp);
-                            _mm512_store_pd(&sum_array[roundpos + 32], _mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dx_array));
-                            _mm512_store_pd(&sum_array[roundpos + 64], _mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dy_array));
-                            _mm512_store_pd(&sum_array[roundpos + 96], _mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dz_array));
+#ifndef useworaround
+                            p_sum += _mm512_reduce_add_pd(m512_ir_tmp);
+                            f_sum_zero += _mm512_reduce_add_pd(_mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dx_array));
+                            f_sum_one += _mm512_reduce_add_pd(_mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dy_array));
+                            f_sum_two += _mm512_reduce_add_pd(_mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dz_array));
                         }
+#else
+                        // BEGIN WORK AROUND for the non functional reduce_add
+                        _mm512_store_pd(&sum_array[roundpos], m512_ir_tmp);
+                        _mm512_store_pd(&sum_array[roundpos + 32], _mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dx_array));
+                        _mm512_store_pd(&sum_array[roundpos + 64], _mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dy_array));
+                        _mm512_store_pd(&sum_array[roundpos + 96], _mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dz_array));
+                    }
 
-                        unsigned int oldroundpos = roundpos;
+                    for (roundpos = 0; roundpos < roundsizefull; roundpos++) {
+                        f_sum_two += sum_array[roundpos + 96];
+                        f_sum_one += sum_array[roundpos + 64];
+                        f_sum_zero += sum_array[roundpos + 32];
+                        p_sum += sum_array[roundpos];
+                    }
+                    // END WORK AROUND
+#endif
+                        if (roundsizeremainder > 0) {
+                            for (roundpos = roundsizefull; roundpos < roundsize; roundpos++) {
+                                dx = xyz0[i * 3 + 0] - xyz1[j * 3 + 0]
+                                     - (pd_x_array[roundpos] * box_a[0])
+                                     - (pd_y_array[roundpos] * box_b[0])
+                                     - (pd_z_array[roundpos] * box_c[0]);
+                                dy = xyz0[i * 3 + 1] - xyz1[j * 3 + 1]
+                                     - (pd_x_array[roundpos] * box_a[1])
+                                     - (pd_y_array[roundpos] * box_b[1])
+                                     - (pd_z_array[roundpos] * box_c[1]);
+                                dz = xyz0[i * 3 + 2] - xyz1[j * 3 + 2]
+                                     - (pd_x_array[roundpos] * box_a[2])
+                                     - (pd_y_array[roundpos] * box_b[2])
+                                     - (pd_z_array[roundpos] * box_c[2]);
 
-                        for (roundpos = 0; roundpos < oldroundpos - 7; roundpos++) {
-                            f_sum_two += sum_array[roundpos + 96];
-                            f_sum_one += sum_array[roundpos + 64];
-                            f_sum_zero += sum_array[roundpos + 32];
-                            p_sum += sum_array[roundpos];
-                        }
+                                ir = 1.0 / fcs_sqrt(z_sqr(dx) + z_sqr(dy) + z_sqr(dz));
 
-                        roundpos = oldroundpos;
-                        // END WORK AROUND
+                                fcs_float temptest = q1[j] * ir;
+                                p_sum += temptest;
 
-                        for (roundpos -= 7; roundpos < roundsize; roundpos++) {
-                            dx = xyz0[i * 3 + 0] - xyz1[j * 3 + 0]
-                                 - (pd_x_array[roundpos] * box_a[0])
-                                 - (pd_y_array[roundpos] * box_b[0])
-                                 - (pd_z_array[roundpos] * box_c[0]);
-                            dy = xyz0[i * 3 + 1] - xyz1[j * 3 + 1]
-                                 - (pd_x_array[roundpos] * box_a[1])
-                                 - (pd_y_array[roundpos] * box_b[1])
-                                 - (pd_z_array[roundpos] * box_c[1]);
-                            dz = xyz0[i * 3 + 2] - xyz1[j * 3 + 2]
-                                 - (pd_x_array[roundpos] * box_a[2])
-                                 - (pd_y_array[roundpos] * box_b[2])
-                                 - (pd_z_array[roundpos] * box_c[2]);
-
-                            ir = 1.0 / fcs_sqrt(z_sqr(dx) + z_sqr(dy) + z_sqr(dz));
-
-                            fcs_float temptest = q1[j] * ir;
-                            p_sum += temptest;
-
-                            temptest *= ir * ir;
-                            f_sum_zero += temptest * dx;
-                            f_sum_one += temptest * dy;
-                            f_sum_two += temptest * dz;
+                                temptest *= ir * ir;
+                                f_sum_zero += temptest * dx;
+                                f_sum_one += temptest * dy;
+                                f_sum_two += temptest * dz;
+                            }
                         }
                     }
                 }

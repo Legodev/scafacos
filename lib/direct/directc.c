@@ -280,7 +280,8 @@ static void directc_print_particles(fcs_int n, fcs_float *xyz, fcs_float *q, fcs
 
 
 //#include "solvervariants/openmp.c"
-#include "solvervariants/intrinsics.c"
+//#include "solvervariants/intrinsics.c"
+#include "solvervariants/intrinsicsv2.c"
 
 static void directc_global(fcs_directc_t *directc, fcs_int *periodic, int size, int rank, MPI_Comm comm)
 {

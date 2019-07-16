@@ -22,6 +22,7 @@ directc_local_periodic(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, f
 
     fcs_int i, j, pd_x, pd_y, pd_z;
     fcs_float dx, dy, dz, ir;
+    // required for fallback code
     fcs_float p_sum, f_sum_zero, f_sum_one, f_sum_two;
 
     unsigned fcs_int

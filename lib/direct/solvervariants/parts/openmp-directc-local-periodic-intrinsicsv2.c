@@ -67,11 +67,6 @@ directc_local_periodic(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, f
 
 #pragma omp parallel for schedule(static) private(i, j, pd_x, pd_y, pd_z, dx, dy, dz, ir, roundpos) firstprivate(q1, xyz0, xyz1, box_a, box_b, box_c, cutoff, roundsize, p, f, pd_x_array, pd_y_array, pd_z_array)
             for (i = 0; i < n0; ++i) {
-                p_sum = 0.0;
-                f_sum_zero = 0.0;
-                f_sum_one = 0.0;
-                f_sum_two = 0.0;
-
                 __m512d m512_p_sum = _mm512_setzero_pd();
                 __m512d m512_f_sum_zero = _mm512_setzero_pd();
                 __m512d m512_f_sum_one = _mm512_setzero_pd();
@@ -80,15 +75,12 @@ directc_local_periodic(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, f
 #define PERIODIC_INNER_THREADS 4
                 const int nthreads = PERIODIC_INNER_THREADS;
 
-                __m512d *m512_p_sum_array = (__m512d *) calloc(nthreads, sizeof(__m512d));
-                __m512d *m512_f_sum_zero_array = (__m512d *) calloc(nthreads, sizeof(__m512d));
-                __m512d *m512_f_sum_one_array = (__m512d *) calloc(nthreads, sizeof(__m512d));
-                __m512d *m512_f_sum_two_array = (__m512d *) calloc(nthreads, sizeof(__m512d));
-
 #pragma omp parallel num_threads(PERIODIC_INNER_THREADS)
                 {
                     const int ithread = omp_get_thread_num();
-#pragma omp for schedule(static) private(j, pd_x, pd_y, pd_z, dx, dy, dz, ir, roundpos) firstprivate(q1, xyz0, xyz1, box_a, box_b, box_c, cutoff, roundsize, pd_x_array, pd_y_array, pd_z_array, m512_p_sum_array, m512_f_sum_zero_array, m512_f_sum_one_array, m512_f_sum_two_array)
+#pragma omp declare reduction (mm512_add_pd : __m512d : omp_out = _mm512_add_pd(omp_out, omp_in)) omp_priv=_mm512_setzero_pd()
+
+#pragma omp parallel for schedule(static) private(j, pd_x, pd_y, pd_z, dx, dy, dz, ir, roundpos) reduction(mm512_add_pd:m512_p_sum, m512_f_sum_zero, m512_f_sum_one, m512_f_sum_two) firstprivate(q1, xyz0, xyz1, box_a, box_b, box_c, cutoff, roundsize, pd_x_array, pd_y_array, pd_z_array)
                     for (j = 0; j < n1; ++j) {
                         __m512d m512_xyz0_array = _mm512_set1_pd(xyz0[i * 3 + 0] - xyz1[j * 3 + 0]);
                         __m512d m512_xyz1_array = _mm512_set1_pd(xyz0[i * 3 + 1] - xyz1[j * 3 + 1]);
@@ -140,16 +132,13 @@ directc_local_periodic(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, f
                             __m512d m512_ir_ir_ir_tmp = _mm512_mul_pd(m512_ir_array,
                                                                       _mm512_mul_pd(m512_ir_array, m512_ir_tmp));
 
-                            m512_p_sum_array[ithread] = _mm512_add_pd(m512_p_sum_array[ithread], m512_ir_tmp);
-                            m512_f_sum_zero_array[ithread] = _mm512_add_pd(m512_f_sum_zero_array[ithread],
-                                                                           _mm512_mul_pd(m512_ir_ir_ir_tmp,
-                                                                                         m512_dx_array));
-                            m512_f_sum_one_array[ithread] = _mm512_add_pd(m512_f_sum_one_array[ithread],
-                                                                          _mm512_mul_pd(m512_ir_ir_ir_tmp,
-                                                                                        m512_dy_array));
-                            m512_f_sum_two_array[ithread] = _mm512_add_pd(m512_f_sum_two_array[ithread],
-                                                                          _mm512_mul_pd(m512_ir_ir_ir_tmp,
-                                                                                        m512_dz_array));
+                            m512_p_sum = _mm512_add_pd(m512_p_sum, m512_ir_tmp);
+                            m512_f_sum_zero = _mm512_add_pd(m512_f_sum_zero, _mm512_mul_pd(m512_ir_ir_ir_tmp,
+                                                                                           m512_dx_array));
+                            m512_f_sum_one = _mm512_add_pd(m512_f_sum_one, _mm512_mul_pd(m512_ir_ir_ir_tmp,
+                                                                                         m512_dy_array));
+                            m512_f_sum_two = _mm512_add_pd(m512_f_sum_two, _mm512_mul_pd(m512_ir_ir_ir_tmp,
+                                                                                         m512_dz_array));
                         }
 
                         if (roundsizeremainder > 0) {
@@ -187,35 +176,16 @@ directc_local_periodic(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, f
                             __m512d m512_ir_ir_ir_tmp = _mm512_mul_pd(m512_ir_array,
                                                                       _mm512_mul_pd(m512_ir_array, m512_ir_tmp));
 
-                            m512_p_sum_array[ithread] = _mm512_mask_add_pd(m512_p_sum_array[ithread], _k_mask,
-                                                                           m512_p_sum_array[ithread], m512_ir_tmp);
-                            m512_f_sum_zero_array[ithread] = _mm512_mask_add_pd(m512_p_sum_array[ithread], _k_mask,
-                                                                                m512_f_sum_zero_array[ithread],
-                                                                                _mm512_mul_pd(m512_ir_ir_ir_tmp,
-                                                                                              m512_dx_array));
-                            m512_f_sum_one_array[ithread] = _mm512_mask_add_pd(m512_p_sum_array[ithread], _k_mask,
-                                                                               m512_f_sum_one_array[ithread],
-                                                                               _mm512_mul_pd(m512_ir_ir_ir_tmp,
-                                                                                             m512_dy_array));
-                            m512_f_sum_two_array[ithread] = _mm512_mask_add_pd(m512_p_sum_array[ithread], _k_mask,
-                                                                               m512_f_sum_two_array[ithread],
-                                                                               _mm512_mul_pd(m512_ir_ir_ir_tmp,
-                                                                                             m512_dz_array));
+                            m512_p_sum = _mm512_mask_add_pd(m512_p_sum, _k_mask, m512_p_sum, m512_ir_tmp);
+                            m512_f_sum_zero = _mm512_mask_add_pd(m512_f_sum_zero, _k_mask, m512_f_sum_zero,
+                                                                 _mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dx_array));
+                            m512_f_sum_one = _mm512_mask_add_pd(m512_f_sum_one, _k_mask, m512_f_sum_one,
+                                                                _mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dy_array));
+                            m512_f_sum_two = _mm512_mask_add_pd(m512_f_sum_two, _k_mask, m512_f_sum_two,
+                                                                _mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dz_array));
                         }
                     }
                 }
-
-                for (int i = 0; i < nthreads; i++) {
-                    m512_p_sum = _mm512_add_pd(m512_p_sum, m512_p_sum_array[i]);
-                    m512_f_sum_zero = _mm512_add_pd(m512_p_sum, m512_f_sum_zero_array[i]);
-                    m512_f_sum_one = _mm512_add_pd(m512_p_sum, m512_f_sum_one_array[i]);
-                    m512_f_sum_two = _mm512_add_pd(m512_p_sum, m512_f_sum_two_array[i]);
-                }
-
-                free(m512_p_sum_array);
-                free(m512_f_sum_zero_array);
-                free(m512_f_sum_one_array);
-                free(m512_f_sum_two_array);
 
                 p[i] += _mm512_reduce_add_pd(m512_p_sum);
                 f[i * 3 + 0] += _mm512_reduce_add_pd(m512_f_sum_zero);

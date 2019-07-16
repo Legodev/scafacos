@@ -72,10 +72,6 @@ directc_local_periodic(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, f
                 __m512d m512_f_sum_one = _mm512_setzero_pd();
                 __m512d m512_f_sum_two = _mm512_setzero_pd();
 
-#define PERIODIC_INNER_THREADS 4
-                const int nthreads = PERIODIC_INNER_THREADS;
-
-#pragma omp parallel num_threads(PERIODIC_INNER_THREADS)
                 {
 #pragma omp declare reduction (mm512_add_pd : __m512d : omp_out = _mm512_add_pd(omp_out, omp_in)) initializer(omp_priv = _mm512_setzero_pd())
 #pragma omp parallel for schedule(static) private(j, pd_x, pd_y, pd_z, dx, dy, dz, ir, roundpos) reduction(mm512_add_pd:m512_p_sum, m512_f_sum_zero, m512_f_sum_one, m512_f_sum_two) firstprivate(q1, xyz0, xyz1, box_a, box_b, box_c, cutoff, roundsize, pd_x_array, pd_y_array, pd_z_array)

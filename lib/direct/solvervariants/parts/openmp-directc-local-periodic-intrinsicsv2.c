@@ -77,10 +77,8 @@ directc_local_periodic(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, f
 
 #pragma omp parallel num_threads(PERIODIC_INNER_THREADS)
                 {
-                    const int ithread = omp_get_thread_num();
-#pragma omp declare reduction (mm512_add_pd : __m512d : omp_out = _mm512_add_pd(omp_out, omp_in)) omp_priv=_mm512_setzero_pd()
-
-#pragma omp parallel for schedule(static) private(j, pd_x, pd_y, pd_z, dx, dy, dz, ir, roundpos) reduction(mm512_add_pd:m512_p_sum, m512_f_sum_zero, m512_f_sum_one, m512_f_sum_two) firstprivate(q1, xyz0, xyz1, box_a, box_b, box_c, cutoff, roundsize, pd_x_array, pd_y_array, pd_z_array)
+#pragma omp declare reduction (mm512_add_pd : __m512d : omp_out = _mm512_add_pd(omp_out, omp_in)) initializer(omp_priv = _mm512_setzero_pd())
+#pragma omp parallel for schedule(static) private(j, pd_x, pd_y, pd_z, dx, dy, dz, ir, roundpos) reduction(mm512_add_pd:m512_p_sum, m512_f_sum_zero, m512_f_sum_one, m512_f_sum_two) firstprivate(q1, xyz0, xyz1, box_a, box_b, box_c, cutoff, roundsize, pd_x_array, pd_y_array, pd_z_array) shared(m512_box_a0_array, m512_box_a1_array, m512_box_a2_array, m512_box_b0_array, m512_box_b1_array, m512_box_b2_array, m512_box_c0_array, m512_box_c1_array, m512_box_c2_array)
                     for (j = 0; j < n1; ++j) {
                         __m512d m512_xyz0_array = _mm512_set1_pd(xyz0[i * 3 + 0] - xyz1[j * 3 + 0]);
                         __m512d m512_xyz1_array = _mm512_set1_pd(xyz0[i * 3 + 1] - xyz1[j * 3 + 1]);

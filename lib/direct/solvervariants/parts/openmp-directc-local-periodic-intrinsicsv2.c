@@ -65,7 +65,7 @@ directc_local_periodic(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, f
                         roundpos++;
                     }
 
-#pragma omp parallel for schedule(static) private(i, j, pd_x, pd_y, pd_z, dx, dy, dz, ir, roundpos) firstprivate(q1, xyz0, xyz1, box_a, box_b, box_c, cutoff, roundsize) shared(p, f, pd_x_array, pd_y_array, pd_z_array)
+#pragma omp parallel for schedule(static) private(i, j, pd_x, pd_y, pd_z, dx, dy, dz, ir, roundpos) firstprivate(q1, xyz0, xyz1, box_a, box_b, box_c, cutoff, roundsize, p, f, pd_x_array, pd_y_array, pd_z_array)
             for (i = 0; i < n0; ++i) {
                 p_sum = 0.0;
                 f_sum_zero = 0.0;
@@ -88,7 +88,7 @@ directc_local_periodic(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, f
 #pragma omp parallel num_threads(PERIODIC_INNER_THREADS)
                 {
                     const int ithread = omp_get_thread_num();
-#pragma omp for schedule(static) private(j, pd_x, pd_y, pd_z, dx, dy, dz, ir, roundpos) firstprivate(q1, xyz0, xyz1, box_a, box_b, box_c, cutoff, roundsize, pd_x_array, pd_y_array, pd_z_array)
+#pragma omp for schedule(static) private(j, pd_x, pd_y, pd_z, dx, dy, dz, ir, roundpos) firstprivate(q1, xyz0, xyz1, box_a, box_b, box_c, cutoff, roundsize, pd_x_array, pd_y_array, pd_z_array, m512_p_sum_array, m512_f_sum_zero_array, m512_f_sum_one_array, m512_f_sum_two_array)
                     for (j = 0; j < n1; ++j) {
                         __m512d m512_xyz0_array = _mm512_set1_pd(xyz0[i * 3 + 0] - xyz1[j * 3 + 0]);
                         __m512d m512_xyz1_array = _mm512_set1_pd(xyz0[i * 3 + 1] - xyz1[j * 3 + 1]);

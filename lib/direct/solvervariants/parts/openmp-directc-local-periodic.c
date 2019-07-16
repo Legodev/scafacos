@@ -57,7 +57,7 @@ directc_local_periodic(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, f
                         roundpos++;
                     }
 
-#pragma omp parallel for schedule(static) private(i, j, pd_x, pd_y, pd_z, dx, dy, dz, ir, roundpos, p_sum, f_sum_zero, f_sum_one, f_sum_two) firstprivate(q1, xyz0, xyz1, box_a, box_b, box_c, cutoff, roundsize) shared(p, f, pd_x_array, pd_y_array, pd_z_array)
+#pragma omp parallel for schedule(static) private(i, j, pd_x, pd_y, pd_z, dx, dy, dz, ir, roundpos, p_sum, f_sum_zero, f_sum_one, f_sum_two) firstprivate(q1, xyz0, xyz1, box_a, box_b, box_c, cutoff, roundsize, p, f, pd_x_array, pd_y_array, pd_z_array)
             for (i = 0; i < n0; ++i) {
                 p_sum = 0.0;
                 f_sum_zero = 0.0;

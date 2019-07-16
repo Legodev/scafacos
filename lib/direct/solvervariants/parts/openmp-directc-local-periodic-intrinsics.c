@@ -172,21 +172,20 @@ directc_local_periodic(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, f
 
                             p_sum += _mm512_mask_reduce_add_pd(_k_mask, m512_ir_tmp);
                             f_sum_zero += _mm512_mask_reduce_add_pd(_k_mask,
-                                                               _mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dx_array));
-                            f_sum_one += _mm512_mask_reduce_add_pd(_k_mask, _mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dy_array));
-                            f_sum_two += _mm512_mask_reduce_add_pd(_k_mask, _mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dz_array));
+                                                                    _mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dx_array));
+                            f_sum_one += _mm512_mask_reduce_add_pd(_k_mask,
+                                                                   _mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dy_array));
+                            f_sum_two += _mm512_mask_reduce_add_pd(_k_mask,
+                                                                   _mm512_mul_pd(m512_ir_ir_ir_tmp, m512_dz_array));
                         }
                     }
                 }
 
-#pragma omp critical
-                {
-                    p[i] += p_sum;
+                p[i] += p_sum;
 
-                    f[i * 3 + 0] += f_sum_zero;
-                    f[i * 3 + 1] += f_sum_one;
-                    f[i * 3 + 2] += f_sum_two;
-                }
+                f[i * 3 + 0] += f_sum_zero;
+                f[i * 3 + 1] += f_sum_one;
+                f[i * 3 + 2] += f_sum_two;
             }
         }
 // less optimized but dynamic fallback code

@@ -95,14 +95,11 @@ directc_local_periodic(fcs_int n0, fcs_float *xyz0, fcs_float *q0, fcs_int n1, f
                     }
                 }
 
-#pragma omp critical
-                {
-                    p[i] += p_sum;
+                p[i] += p_sum;
 
-                    f[i * 3 + 0] += f_sum_zero;
-                    f[i * 3 + 1] += f_sum_one;
-                    f[i * 3 + 2] += f_sum_two;
-                }
+                f[i * 3 + 0] += f_sum_zero;
+                f[i * 3 + 1] += f_sum_one;
+                f[i * 3 + 2] += f_sum_two;
             }
         }
 // less optimized but dynamic fallback code
